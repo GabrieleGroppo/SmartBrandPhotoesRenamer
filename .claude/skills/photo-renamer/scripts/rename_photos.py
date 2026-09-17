@@ -52,6 +52,7 @@ trova una combinazione qualita'/dimensione accettabile.
 import argparse
 import csv
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -123,7 +124,10 @@ def compress_image_magick(file_path):
         return None
 
     extent = f"{COMPRESS_TARGET_KB}KB"
-    fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(file_path)[1])
+    # Il file temporaneo deve stare sullo stesso filesystem della destinazione:
+    # os.replace() e' un rename atomico e fallisce con "Invalid cross-device
+    # link" se /tmp e la cartella assets/ sono su mount diversi (es. tmpfs).
+    fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(file_path)[1], dir=os.path.dirname(file_path))
     os.close(fd)
     try:
         subprocess.run(
@@ -187,13 +191,33 @@ def resolve_config(brand, cli_ean_column, cli_code_columns):
     return ean_column, code_columns, swatch_position
 
 
+CODE_COLUMN_SLICE_RE = re.compile(r"^(.+)\[(-?\d*):(-?\d*)\]$")
+
+
+def parse_code_column(col):
+    """Supporta la sintassi 'NomeColonna[start:end]' per usare solo un
+    sottoinsieme dei token separati da spazio del valore di una colonna.
+
+    Serve per i campi "composti" (piu' identificatori in un'unica cella, es.
+    'CODICE SOTTOCODICE STAGIONE') in cui uno dei token (tipicamente la
+    stagione, costante per tutto il file) non compare nei nomi foto e quindi
+    andrebbe escluso dal confronto. Torna (nome_colonna_reale, slice|None).
+    """
+    m = CODE_COLUMN_SLICE_RE.match(col)
+    if not m:
+        return col, None
+    name, start, end = m.groups()
+    return name, slice(int(start) if start else None, int(end) if end else None)
+
+
 def validate_columns(workbook, ean_column, code_columns):
     all_columns = set()
     for records in workbook.values():
         if records:
             all_columns.update(records[0].keys())
 
-    missing = [c for c in [ean_column, *code_columns] if c not in all_columns]
+    code_column_names = [parse_code_column(c)[0] for c in code_columns]
+    missing = [c for c in [ean_column, *code_column_names] if c not in all_columns]
     if missing:
         sys.exit(
             f"Colonne non trovate nel file Excel: {missing}\n"
@@ -220,8 +244,11 @@ def build_code(row, code_columns):
     """Ritorna (codice_concatenato, segments[(colonna, valore_pulito)], is_partial)."""
     segments = []
     for col in code_columns:
-        val = row.get(col)
+        name, word_slice = parse_code_column(col)
+        val = row.get(name)
         if val not in (None, ""):
+            if word_slice is not None:
+                val = " ".join(str(val).split()[word_slice])
             # rimuove anche gli spazi interni (es. "E1 M50 12 01 01" -> "E1M50120101"):
             # nei file Excel il codice e' spesso "impaginato" con spazi che non compaiono nel nome file
             cleaned = "".join(str(val).split())

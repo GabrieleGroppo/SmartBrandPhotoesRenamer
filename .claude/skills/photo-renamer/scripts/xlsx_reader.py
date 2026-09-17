@@ -74,7 +74,11 @@ def read_workbook(path):
                 continue
 
             header_row = raw_rows[0]
-            max_col = max(header_row.keys(), default=-1)
+            # Alcune colonne dati non hanno intestazione (nessuna cella nella riga 1,
+            # es. colonne aggiunte in fondo al foglio senza etichetta): calcolare
+            # max_col solo dalla riga di intestazione le farebbe scartare in
+            # silenzio. Si considera quindi la larghezza massima su TUTTE le righe.
+            max_col = max((max(r.keys(), default=-1) for r in raw_rows), default=-1)
             headers = [header_row.get(i) or f"__col{i}__" for i in range(max_col + 1)]
 
             records = []

@@ -1,0 +1,9 @@
+{
+  "ean_column": "__col11__",
+  "code_columns": [
+    "Articolo[:2]",
+    "Cod Col"
+  ],
+  "swatch_position": null,
+  "notes": "Excel 'BARCODE LIUJO AI26.xlsx': colonne K/L (l'EAN13 vero) non hanno intestazione nella riga 1, quindi xlsx_reader le espone come '__col10__'/'__col11__' (bug corretto in xlsx_reader.py: il calcolo di max_col guardava solo la riga di intestazione, ignorando colonne dati oltre l'ultima intestata). EAN13 = '__col11__'. Codice foto = primi 2 token (spazio) di 'Articolo' (es. 'AF6001 ES039 AI26' -> 'AF6001ES039', il terzo token e' sempre la stagione 'AI26', costante e assente dai nomi foto, va escluso con [:2]) + 'Cod Col'. Molte righe hanno EAN vuoto (~55%): normale per questo file secondo l'utente, vengono gia' skippate da iter_unique_ean_rows."
+}

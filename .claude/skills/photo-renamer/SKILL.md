@@ -24,6 +24,10 @@ assets/<stagione>/<brand>/
 └── reports/             <- creata dallo script: report CSV
 ```
 
+Questa è la struttura **dopo** il Passo 0: il materiale grezzo consegnato dal
+cliente ha spesso le foto dentro sottocartelle annidate (zip estratti) invece
+di stare già a questo livello — `prepare_folder.py` la sistema in automatico.
+
 `assets/` è nel `.gitignore`: è materiale del cliente, non va versionato.
 Le foto rinominate con successo vengono **spostate** in `rinominate/`, non
 solo rinominate sul posto: così restano separate dagli originali non ancora
@@ -41,7 +45,25 @@ L'utente specifica **stagione** e **brand** (es. `ai26 borbonese`), corrisponden
 a `assets/ai26/borbonese/`. Se manca uno dei due, chiedilo prima di procedere:
 non indovinare quale sottocartella di `assets/` usare se ce n'è più di una.
 
-## Passo 1 — Config già nota? Riusala, ma verificala
+## Passo 0 — Predisponi la cartella (sempre, prima di ogni altra cosa)
+
+Il materiale consegnato dal cliente arriva spesso con le foto dentro
+sottocartelle annidate (zip estratti con struttura tipo
+`<hash>/<collezione>/<taglia>/foto.jpg`) invece che già allo stesso livello
+del file Excel. Prima di passare al Passo 1, esegui **sempre**:
+
+```
+python3 .claude/skills/photo-renamer/scripts/prepare_folder.py <stagione> <brand>
+```
+
+Lo script è idempotente (se la cartella è già nella struttura attesa non fa
+nulla): porta tutte le foto annidate al livello del brand (stesso livello del
+.xlsx), scarta i doppioni identici (stesso contenuto, verificato per hash,
+mai per nome soltanto), rimuove le sottocartelle rimaste vuote ed elimina gli
+archivi `.zip` originali al livello del brand — ma solo se non sono rimasti
+conflitti. Se lo script segnala **CONFLITTI** (stesso nome file ma contenuto
+diverso), non decidere da solo quale tenere: mostra la lista all'utente e
+chiedi come procedere prima di continuare con il Passo 1.
 
 Controlla se esiste già `.claude/skills/photo-renamer/brand_configs/<brand>.json`
 (nomi file in minuscolo). Se esiste, salta al Passo 3 usando quella
@@ -68,6 +90,20 @@ Analizza l'output tu stesso (ragionamento, non uno script) per dedurre:
    lunghezza 8, 12, 13 o 14** (EAN-8/UPC-12/EAN-13/ITF-14). Usa nome colonna +
    statistiche insieme, non uno dei due da solo.
 
+   Se **nessuna colonna con nome sensato sembra un EAN** (capitato con Liujo:
+   file chiamato letteralmente `BARCODE LIUJO AI26.xlsx` ma senza nessuna
+   colonna "Barcode"/"EAN" visibile in `inspect_brand.py`), controlla se
+   `inspect_brand.py` mostra colonne chiamate `__colN__`: sono colonne che
+   hanno dati ma **nessuna intestazione** nella riga 1 dell'Excel (tipico di
+   colonne aggiunte in fondo al foglio senza etichetta) — spesso è proprio lì
+   che si nasconde l'EAN vero. Prima di concludere che l'EAN non esiste,
+   guarda le statistiche di *tutte* le `__colN__`, non solo delle colonne con
+   nome. Se anche lì non c'è nulla che sembri un EAN, non indovinare: chiedi
+   conferma all'utente (magari il file giusto è un altro, o quel brand/ordine
+   non ha barcode per alcuni prodotti — capita, e va bene lasciare quelle
+   righe senza foto rinominata: `iter_unique_ean_rows` salta già da sola le
+   righe con EAN vuoto).
+
 2. **Colonne codice** (`code_columns`, in ordine): il sottoinsieme di colonne
    la cui concatenazione (valori ripuliti, maiuscolo/minuscolo indifferente)
    riproduce il "codice candidato" visto nei nomi foto. Sono in genere campi
@@ -82,6 +118,17 @@ Analizza l'output tu stesso (ragionamento, non uno script) per dedurre:
    è normale e lo script gestisce già il matching parziale (colonne vuote
    vengono saltate nella concatenazione). Non serve che tu forzi un match
    perfetto al 100% delle righe.
+
+   **Colonne "composte"**: a volte una singola colonna contiene più
+   identificatori uniti da spazio in un'unica cella (es. Liujo: `Articolo` =
+   `"2F6001 MA29S AI26"`, dove il terzo token è la stagione, ripetuta
+   identica su ogni riga del file e **assente** dai nomi foto). Concatenare
+   l'intero valore fallirebbe sia il match esatto sia quello per sottostringa
+   (la stagione non compare mai nel nome file). In questo caso usa la
+   sintassi `NomeColonna[start:end]` in `--code-columns` per restringere il
+   valore ai soli token (separati da spazio, slice Python standard su
+   `valore.split()`) che servono, es. `--code-columns "Articolo[:2],Cod Col"`
+   per prendere solo i primi due token di `Articolo` e scartare il terzo.
 
 3. Se non riesci a determinare un sottoinsieme di colonne che spieghi la
    maggioranza dei codici visti nei file, chiedi conferma all'utente prima
@@ -182,6 +229,15 @@ campione colore → `scartate_*.csv`, foto senza EAN corrispondente →
   procedere al Passo 4, così può decidere se procedere o controllare prima
   il materiale con il brand.
 
+  Caso frequente verificato più volte (mandarina e liujo ai26): l'Excel è un
+  **ordine per pochi negozi/clienti specifici**, non il catalogo completo —
+  copre solo una minima parte degli articoli/colori effettivamente
+  fotografati. In quel caso un tasso di match anche sotto il 5% è normale e
+  atteso (verificalo scegliendo 2-3 codici da `foto_senza_ean_*.csv` e
+  controllando che quell'Articolo non compaia proprio in nessuna riga
+  dell'Excel, non solo con quel colore): non è un errore di config, va solo
+  segnalato all'utente com'è per farlo decidere.
+
 ## Passo 4 — Conferma ed esecuzione reale
 
 Mostra all'utente il riepilogo del dry-run (quante foto verrebbero
@@ -215,9 +271,18 @@ foto, eventuali RED FLAG non risolti).
   viene saltata senza errori. Con `--skip-compress` la si disattiva
   esplicitamente. Non fa backup degli originali prima di comprimere (la
   compressione è lossy e irreversibile): se serve conservarli, copiali altrove
-  prima di eseguire lo script senza `--dry-run`.
+  prima di eseguire lo script senza `--dry-run`. Il file temporaneo usato da
+  ImageMagick viene creato nella stessa cartella del file finale (non in
+  `/tmp`): se fosse su un filesystem diverso, lo swap finale (`os.replace`)
+  fallirebbe con "Invalid cross-device link" — capitato la prima volta su
+  `rinominate/` di mandarina.
 - Nessuna dipendenza esterna (niente pandas/openpyxl): la lettura xlsx è
-  fatta con `xlsx_reader.py`, solo standard library.
+  fatta con `xlsx_reader.py`, solo standard library. Legge le colonne anche
+  se non hanno intestazione nella riga 1 (le espone come `__colN__`,
+  `N`=indice colonna 0-based): la larghezza del foglio viene calcolata su
+  *tutte* le righe, non solo sulla riga di intestazione, altrimenti colonne
+  dati aggiunte in fondo al foglio senza etichetta (visto con l'EAN di
+  Liujo) verrebbero scartate in silenzio.
 - Le righe Excel duplicate per lo stesso EAN (tipico quando lo stesso
   prodotto compare per più clienti/filiali) vengono deduplicate
   automaticamente: vince la prima occorrenza.

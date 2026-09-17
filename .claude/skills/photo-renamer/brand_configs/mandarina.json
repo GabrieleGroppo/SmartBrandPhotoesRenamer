@@ -1,0 +1,9 @@
+{
+  "ean_column": "Barcode EAN13",
+  "code_columns": [
+    "Codice articolo",
+    "Codice colore"
+  ],
+  "swatch_position": null,
+  "notes": "Dedotto da assets/ai26/mandarina.xlsx (4 fogli, un ordine specifico per store): EAN13 in 'Barcode EAN13' (13 cifre). Codice foto = 'Codice articolo'+'Codice colore' concatenati (es. P10QMTV8+B12=P10QMTV8B12). Verificato a mano su piu' righe. L'excel copre solo un sottoinsieme di colori per articolo (e' un ordine, non il catalogo completo): e' normale un basso tasso di match, non un errore di config."
+}
