@@ -1,0 +1,9 @@
+{
+  "ean_column": "UPC#/ EAN CODE",
+  "code_columns": [
+    "Style#",
+    "Color#"
+  ],
+  "swatch_position": null,
+  "notes": "Excel 'MENDINO FILE UPC & MISURE WACC.xlsx' (ordine Mendino, 1 foglio, righe ripetute per negozio). EAN = 'UPC#/ EAN CODE' (UPC-A 12 cifre, unica colonna barcode). Nomi foto: '<prefisso>-<Style#>-<Color#>_<N>.jpg' con prefisso 'JPG' o 'AI SEARCH' (es. JPG-30F6ANXS7E-001_1.jpg); Style#+Color# = SKU. Il prefisso impedisce il match esatto (che parte dal primo token): si va sempre di fallback substring, sicuro perche' max 6 foto per prodotto. Il WeTransfer contiene per ogni scatto anche X.tif e X-1.tif alla stessa risoluzione del JPG: si copiano in assets/ solo i JPG."
+}

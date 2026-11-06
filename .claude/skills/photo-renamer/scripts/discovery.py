@@ -1,5 +1,4 @@
 """Helper condivisi per individuare cartelle/file di una coppia (stagione, brand)."""
-import glob
 import os
 import re
 import sys
@@ -22,9 +21,12 @@ def require_brand_dir(season, brand):
 
 
 def find_excel(brand_dir):
-    candidates = [
-        c for c in glob.glob(os.path.join(brand_dir, "*.xlsx")) if not os.path.basename(c).startswith("~$")
-    ]
+    # Estensione case-insensitive: capita che arrivi ".XLSX" maiuscolo (guess ai26).
+    candidates = sorted(
+        os.path.join(brand_dir, f)
+        for f in os.listdir(brand_dir)
+        if f.lower().endswith(".xlsx") and not f.startswith("~$")
+    )
     if not candidates:
         sys.exit(f"Nessun file .xlsx trovato in {brand_dir}")
     if len(candidates) > 1:

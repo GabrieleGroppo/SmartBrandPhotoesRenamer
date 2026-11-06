@@ -1,0 +1,10 @@
+{
+  "ean_column": "EAN Code",
+  "code_columns": [
+    "Model",
+    "Part",
+    "Color"
+  ],
+  "swatch_position": null,
+  "notes": "Nomi foto: <Model>_<Part>_<Color>_<N>.jpg (es. HWBB93_08180_BLA_1.jpg). EAN in 'EAN Code' (13 cifre); 'UPC Barcode' (12 cifre) e' il codice USA, non usarlo. Excel ai26 = ordine per 2 negozi Mendino (Novara, Busto Arsizio): copre pochissimi dei modelli fotografati."
+}
